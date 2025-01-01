@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Student</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 30px;
+        }
+
+        video, canvas {
+            width: 70%;
+            border: 2px solid #007BFF;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        form {
+            margin-top: 20px;
+        }
+
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button.submit {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        button.submit:hover {
+            background-color: #45a049;
+        }
+
+        button.cancel {
+            background-color: #f44336;
+            color: white;
+        }
+
+        button.cancel:hover {
+            background-color: #e53935;
+        }
+
+        a {
+            display: inline-block;
+            margin-top: 20px;
+            text-decoration: none;
+            color: white;
+            background-color: #007BFF;
+            padding: 10px 20px;
+            border-radius: 5px;
+        }
+
+        a:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Register Student</h1>
+    
+    <!-- Live Video Stream -->
+    <video id="videoStream" autoplay playsinline src="http://192.168.157.209:81/stream"></video>
+    <canvas id="captureCanvas" style="display: none;"></canvas>
+
+    <!-- Form to Register Student -->
+    <form method="POST" action="/register_student">
+        <label for="student_name">Enter Student Name:</label>
+        <input type="text" id="student_name" name="student_name" required>
+        <br><br>
+        <button type="button" class="submit" onclick="startSendingFrames()">Register Face</button>
+        <button type="button" class="cancel" onclick="stopSendingFrames()">Stop</button>
+        <button type="button" class="cancel" onclick="window.location.href='/'">Cancel</button>
+        <div id="message"></div>
+    </form>
+    <br>
+    <a href="/">Back to Home</a>
+
+    <!-- Script for Handling Webcam Stream -->
+    <script>
+        const videoElement = document.getElementById('videoStream');
+        const canvas = document.getElementById('captureCanvas');
+        const ctx = canvas.getContext('2d');
+        let intervalId = null;
+
+        // Access the webcam stream using MediaDevices API
+        // navigator.mediaDevices.getUserMedia({ video: true })
+        //     .then((stream) => {
+        //         videoElement.srcObject = stream;
+        //     })
+        //     .catch((error) => {
+        //         console.error("Error accessing the camera:", error);
+        //         alert("Unable to access the camera. Please allow camera permissions.");
+        //     });
+
+        // Function to capture and send video frames to the backend
+        function startSendingFrames() {
+            const studentName = document.getElementById('student_name').value;
+            if (!studentName) {
+                alert('Please enter the student name before registering.');
+                return;
+            }
+
+            intervalId = setInterval(() => {
+                // Draw the video frame onto the canvas
+                canvas.width = videoElement.videoWidth;
+                canvas.height = videoElement.videoHeight;
+                ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+                // Convert the canvas to a Base64 image
+                const imageData = canvas.toDataURL('image/jpeg');
+
+                // Send the frame to the backend
+                fetch('/process_frame', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        student_name: studentName,
+                        frame: imageData,
+                    }),
+                })
+                .then((response) => response.json())
+                .then((data) => {
+                    document.getElementById('message').innerText = "Registering";
+                    setTimeout(()=>{
+                        document.getElementById('message').innerText = "Saved Successfully";
+                        clearInterval(intervalId);
+                    },5000);
+                })
+                .catch((error) => {
+                    console.error('Error sending frame:', error);
+                });
+            }, 500); // Send frames every 100ms
+        }
+
+        function stopSendingFrames() {
+            clearInterval(intervalId);
+        }
+    </script>
+</body>
+</html>

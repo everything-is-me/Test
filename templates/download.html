@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance Log</title>
+  <!-- Include a popup calendar (datepicker) library -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.9/flatpickr.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.9/flatpickr.min.js"></script>
+  <style>
+    /* Style the button */
+    .btn {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Download Attendance Log</h1>
+  <label for="attendance-date">Select Date: </label>
+  <input type="text" id="attendance-date" class="flatpickr" placeholder="Select date" />
+
+  <button id="download-btn" class="btn">Download Attendance Log</button>
+
+  <script>
+    // Initialize the flatpickr date picker
+    flatpickr("#attendance-date", {
+      dateFormat: "Y-m-d",  // Format the date as YYYY-MM-DD
+      allowInput: true,
+    });
+
+    // Function to download the attendance log for the selected date
+    document.getElementById("download-btn").addEventListener("click", function() {
+      const selectedDate = document.getElementById("attendance-date").value;
+      
+      if (!selectedDate) {
+        alert("Please select a date.");
+        return;
+      }
+
+      // Send the selected date to the backend to fetch the corresponding Excel file
+      fetch(`/download_attendance_log?date=${selectedDate}`, {
+        method: 'GET',
+      })
+      .then(response => {
+        if (response.ok) {
+          // Create a blob from the response (Excel file)
+          return response.blob();
+        }
+        throw new Error("File not found");
+      })
+      .then(blob => {
+        // Create a download link
+        const link = document.createElement('a');
+        const url = window.URL.createObjectURL(blob);
+        link.href = url;
+        link.download = `attendance_log_${selectedDate}.xlsx`;  // Filename based on selected date
+        link.click();
+        window.URL.revokeObjectURL(url);  // Clean up the object URL
+      })
+      .catch(error => {
+        alert("Error: " + error.message);
+      });
+    });
+  </script>
+</body>
+</html>

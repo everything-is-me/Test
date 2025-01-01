@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Start Attendance</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+        h1 {
+            margin-top: 20px;
+        }
+        video {
+            width: 80%;
+            max-width: 600px;
+            border: 2px solid black;
+            border-radius: 10px;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #attendanceLog {
+            margin-top: 20px;
+            text-align: left;
+            display: inline-block;
+            max-width: 600px;
+            width: 80%;
+        }
+        .log-entry {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Start Attendance</h1>
+    <video id="videoStream" autoplay playsinline src="http://192.168.157.209:81/stream"></video>
+    <button id="stopButton">Stop Attendance</button>
+
+    <div id="attendanceLog"></div>
+
+    <script>
+        const video = document.getElementById("videoStream");
+        const stopButton = document.getElementById("stopButton");
+        const attendanceLogDiv = document.getElementById("attendanceLog");
+        let loggedStudents = new Set();  // Set to track logged students
+
+        // Access the camera and start video stream
+        async function startVideoStream() {
+            try {
+                // const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                // video.srcObject = stream;
+
+                // Capture frames and send them to the backend every 1 second
+                setInterval(async () => {
+                    const canvas = document.createElement("canvas");
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                    // Convert frame to Base64
+                    const frame = canvas.toDataURL("image/jpeg");
+
+                    // Send the frame to the backend only if the student hasn't been logged yet
+                    // if (loggedStudents.size < 10) { // Stop after 10 students are logged (for example)
+                        try {
+                            const response = await fetch("/process_attendance_frame", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ frame }),
+                            });
+
+                            const data = await response.json();
+                            if (data.message && data.message.includes("marked")) {
+                                const studentName = data.message.split(" ")[3]; // Extract name
+                                loggedStudents.add(studentName);
+                                console.log(data.message);
+                            }
+                        } catch (error) {
+                            console.error("Error sending frame:", error);
+                        }
+                    // }
+                }, 1000); // Capture frames every 1 second
+            } catch (error) {
+                console.error("Error accessing the camera:", error);
+            }
+        }
+
+        // Stop attendance and stream
+        stopButton.addEventListener("click", () => {
+            const stream = video.srcObject;
+            const tracks = stream.getTracks();
+            tracks.forEach((track) => track.stop()); // Stop all video tracks
+            video.srcObject = null;
+            alert("Attendance stopped!");
+        });
+
+        // Fetch and display attendance log
+        async function loadAttendanceLog() {
+            try {
+                const response = await fetch("/attendance_log");
+                const data = await response.json();
+
+                // Clear existing log
+                attendanceLogDiv.innerHTML = '<h2>Attendance Log</h2>';
+
+                data.forEach(entry => {
+                    const logEntryDiv = document.createElement("div");
+                    logEntryDiv.classList.add("log-entry");
+                    logEntryDiv.innerHTML = `${entry.name} - ${entry.timestamp}`;
+                    attendanceLogDiv.appendChild(logEntryDiv);
+                });
+            } catch (error) {
+                console.error("Error loading attendance log:", error);
+            }
+        }
+
+        // Start video stream on page load
+        startVideoStream();
+
+        // Load attendance log initially
+        loadAttendanceLog();
+
+        // Refresh the attendance log every 5 seconds
+        setInterval(loadAttendanceLog, 5000);
+    </script>
+</body>
+</html>
